@@ -49,7 +49,7 @@ Learn Python programming while growing your virtual companion! CodeCompanion mak
 1. **Download the latest release**
    ```bash
    # Download from releases page or use git
-   git clone https://github.com/yourusername/codecompanion.git
+   git clone https://github.com/hulkingburst/codecompanion.git
    cd codecompanion
    ```
 
