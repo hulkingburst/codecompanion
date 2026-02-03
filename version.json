@@ -1,0 +1,15 @@
+{
+  "version": "2.2.0",
+  "download_url": "https://github.com/yourusername/codecompanion/releases/latest/download/codecompanion.py",
+  "release_notes": "🐛 Bug Fixing Drills Added! Learn debugging skills with interactive challenges. Plus auto-update system and new achievements!",
+  "changelog": [
+    "Added Bug Fixing Drills - Find and fix code bugs!",
+    "Auto-update system - Get notified of new versions",
+    "New achievements: Bug Hunter, Exterminator, Debug Master",
+    "UI improvements and polish",
+    "Better feedback for all drill types",
+    "Fixed all known bugs from previous version"
+  ],
+  "min_python_version": "3.8",
+  "release_date": "2024-01-15"
+}
