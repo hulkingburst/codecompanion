@@ -1,5 +1,19 @@
 {
-       "version": "3.1.1",
-       "download_url": "https://github.com/hulkingburst/codecompanion/releases/latest/download/codecompanion.py",
-       "release_notes": "Perfect clickability + smooth animations!"
-     }
+  "version": "3.1.1",
+  "download_url": "https://github.com/hulkingburst/codecompanion/releases/latest/download/codecompanion.py",
+  "release_notes": "🎯 Perfect clickability + smooth animations! Click anywhere on lesson cards, enjoy smooth scrolling between tabs.",
+  "changelog": [
+    "🎯 ENTIRE lesson cards now clickable (was only top/bottom)",
+    "✨ Smooth scroll animations when switching tabs",
+    "🖱️ Hand cursor shows on entire card area",
+    "⚡ Cached views for instant tab switching",
+    "🎨 Complete UI redesign - Lessons front and center",
+    "🐛 Bug Fixing Drills - Learn debugging skills",
+    "🔄 Auto-update system built-in",
+    "🏆 New achievements for bug fixing",
+    "📊 Enhanced statistics view",
+    "✨ Professional, polished experience"
+  ],
+  "min_python_version": "3.8",
+  "release_date": "2024-01-15"
+}

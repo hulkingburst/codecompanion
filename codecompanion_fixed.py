@@ -32,9 +32,9 @@ from customtkinter import (CTk, CTkFrame, CTkLabel, CTkButton, CTkEntry,
 # VERSION & UPDATE SYSTEM
 # ============================================================================
 
-CURRENT_VERSION = "2.2.0"  # Updated with bug fix drills!
-UPDATE_CHECK_URL = "https://raw.githubusercontent.com/yourusername/codecompanion/main/version.json"
-DOWNLOAD_URL = "https://github.com/yourusername/codecompanion/releases/latest"
+CURRENT_VERSION = "3.1.1"  # Fixed: Entire card clickable + smooth scroll animations!
+UPDATE_CHECK_URL = "https://raw.githubusercontent.com/hulkingburst/codecompanion/main/version.json"
+DOWNLOAD_URL = "https://github.com/hulkingburst/codecompanion/releases/latest"
 
 
 def check_for_updates():
@@ -506,6 +506,7 @@ class Lesson:
     prerequisites: List[str]
     xp_reward: int
     skill_path: str
+    difficulty: int = 1  # 1=Easy, 2=Medium, 3=Hard
     mcq_questions: List[MultipleChoiceQuestion] = field(default_factory=list)
     multi_answer_questions: List[MultiAnswerQuestion] = field(default_factory=list)
     output_drills: List[OutputDrill] = field(default_factory=list)
@@ -1651,93 +1652,6 @@ class HintSystem:
 # SECTION 5: ENHANCED UI COMPONENTS
 # ============================================================================
 
-class CompanionView(CTkFrame):
-    def __init__(self, parent, user: User, on_switch_companion=None):
-        super().__init__(parent, corner_radius=20, fg_color="transparent")
-        self.user = user
-        self.on_switch_companion = on_switch_companion
-        self._create_widgets()
-
-    def _create_widgets(self):
-        colors = get_colors()
-        companion = Companion(
-            CompanionType(self.user.companion_type),
-            self.user.companion_stage,
-            self.user.companion_vitality
-        )
-
-        # FIXED: Use getattr for safe attribute access
-        ui_font = getattr(self.user, 'ui_font', DEFAULT_FONT)
-        code_font = getattr(self.user, 'code_font', CODE_FONT)
-
-        # Animated header
-        header_frame = CTkFrame(self, corner_radius=15,
-                                fg_color=colors['primary'], height=60)
-        header_frame.pack(fill='x', padx=10, pady=(10, 5))
-        header_frame.pack_propagate(False)
-
-        CTkLabel(header_frame, text="Your Companion",
-                 font=ctk.CTkFont(family=ui_font, size=13, weight="bold"),
-                 text_color="white").pack(side='top', pady=(8, 2))
-
-        CTkLabel(header_frame, text=companion.get_name(),
-                 font=ctk.CTkFont(family=ui_font, size=16, weight="bold"),
-                 text_color="white").pack(side='top')
-
-        # Companion ASCII with enhanced styling
-        art_frame = CTkFrame(self, corner_radius=15, fg_color=colors['bg_dark'],
-                             border_width=2, border_color=colors['primary'])
-        art_frame.pack(pady=10, fill='x', padx=10)
-
-        CTkLabel(art_frame, text=companion.get_ascii(),
-                 font=ctk.CTkFont(family=code_font, size=15, weight="bold"),
-                 text_color=colors['accent']).pack(pady=25)
-
-        # Companion Health section
-        vitality_container = CTkFrame(self, corner_radius=12, fg_color=colors['bg_dark'])
-        vitality_container.pack(fill='x', padx=10, pady=5)
-
-        vitality_header = CTkFrame(vitality_container, fg_color="transparent")
-        vitality_header.pack(fill='x', padx=15, pady=(12, 5))
-
-        CTkLabel(vitality_header, text="💚 Companion Health",
-                 font=ctk.CTkFont(family=ui_font, size=13, weight="bold")).pack(side='left')
-
-        # Vitality percentage with color coding
-        vitality_color = colors['success'] if self.user.companion_vitality > 70 else (
-            colors['warning'] if self.user.companion_vitality > 30 else colors['error']
-        )
-        CTkLabel(vitality_header, text=f"{self.user.companion_vitality}%",
-                 font=ctk.CTkFont(family=ui_font, size=13, weight="bold"),
-                 text_color=vitality_color).pack(side='right')
-
-        # Enhanced progress bar
-        progress = CTkProgressBar(vitality_container, corner_radius=8, height=12,
-                                  progress_color=vitality_color)
-        progress.set(self.user.companion_vitality / 100)
-        progress.pack(fill='x', padx=15, pady=(0, 12))
-
-        # Stage info
-        stage_frame = CTkFrame(self, corner_radius=12, fg_color=colors['bg_dark'])
-        stage_frame.pack(fill='x', padx=10, pady=5)
-
-        CTkLabel(stage_frame, text=f"⭐ Stage {self.user.companion_stage}/10",
-                 font=ctk.CTkFont(family=ui_font, size=12),
-                 text_color=colors['text_secondary']).pack(pady=10)
-
-        # Switch companion button
-        if self.on_switch_companion:
-            switch_btn = CTkButton(self, text="🔄 Switch Companion",
-                                   corner_radius=12, height=36,
-                                   fg_color=colors['bg_light'],
-                                   hover_color=colors['primary'],
-                                   border_width=2,
-                                   border_color=colors['bg_light'],
-                                   font=ctk.CTkFont(family=ui_font, size=12),
-                                   command=self.on_switch_companion)
-            switch_btn.pack(pady=(10, 15), padx=10, fill='x')
-
-
 class StatsCard(CTkFrame):
     """Reusable stats card component with enhanced styling"""
 
@@ -1759,138 +1673,6 @@ class StatsCard(CTkFrame):
                  text_color=colors['text_secondary']).pack()
         CTkLabel(content, text=value,
                  font=ctk.CTkFont(family=DEFAULT_FONT, size=22, weight="bold")).pack(pady=(4, 0))
-
-
-class DashboardView(CTkFrame):
-    """Main dashboard showing user progress and daily goals"""
-
-    def __init__(self, parent, user: User, on_lesson_start, on_daily_challenge):
-        super().__init__(parent, corner_radius=20, fg_color="transparent")
-        self.user = user
-        self.on_lesson_start = on_lesson_start
-        self.on_daily_challenge = on_daily_challenge
-        self._create_widgets()
-
-    def _create_widgets(self):
-        colors = get_colors()
-
-        # Welcome header
-        CTkLabel(self, text=f"Welcome back, {self.user.username}!",
-                 font=ctk.CTkFont(family=DEFAULT_FONT, size=26, weight="bold")).pack(pady=(10, 5))
-
-        # Daily progress bar
-        daily_progress_frame = CTkFrame(self, corner_radius=15, fg_color=colors['bg_medium'])
-        daily_progress_frame.pack(fill='x', pady=10)
-
-        CTkLabel(daily_progress_frame,
-                 text=f"Daily Goal: {self.user.today_xp}/{self.user.daily_goal_xp} XP",
-                 font=ctk.CTkFont(family=DEFAULT_FONT, size=13)).pack(anchor='w', padx=10, pady=(10, 5))
-
-        daily_progress = CTkProgressBar(daily_progress_frame, corner_radius=10, height=12)
-        daily_progress.set(min(self.user.today_xp / self.user.daily_goal_xp, 1.0))
-        daily_progress.pack(fill='x', padx=10, pady=(0, 10))
-
-        # Stats grid
-        stats_container = CTkFrame(self, fg_color="transparent")
-        stats_container.pack(fill='x', pady=10)
-
-        # Configure grid
-        for i in range(4):
-            stats_container.grid_columnconfigure(i, weight=1, uniform="stat")
-
-        stats = [
-            ("🔥", "Streak", f"{self.user.streak_days} days"),
-            ("⭐", "Level", str(self.user.level)),
-            ("💎", "XP", str(self.user.xp)),
-            ("📚", "Lessons", str(len(self.user.completed_lessons))),
-        ]
-
-        for i, (icon, label, value) in enumerate(stats):
-            card = StatsCard(stats_container, label, value, icon)
-            card.grid(row=0, column=i, padx=5, sticky="nsew")
-
-        # Daily Challenge section with better design
-        today = datetime.now().date().isoformat()
-        challenge_completed = self.user.daily_challenge_completed == today
-
-        challenge_frame = CTkFrame(self, corner_radius=20,
-                                   fg_color=colors['success'] if challenge_completed else colors['primary'],
-                                   border_width=0)
-        challenge_frame.pack(fill='x', pady=(0, 15))
-
-        challenge_content = CTkFrame(challenge_frame, fg_color="transparent")
-        challenge_content.pack(fill='x', padx=25, pady=25)
-
-        icon = "✅" if challenge_completed else "⭐"
-        CTkLabel(challenge_content,
-                 text=f"{icon} Daily Challenge",
-                 font=ctk.CTkFont(family=DEFAULT_FONT, size=18, weight="bold"),
-                 text_color="white").pack(anchor='w')
-
-        if not challenge_completed:
-            CTkLabel(challenge_content,
-                     text="Complete today's challenge for +50 bonus XP!",
-                     font=ctk.CTkFont(family=DEFAULT_FONT, size=13),
-                     text_color="white").pack(anchor='w', pady=(8, 18))
-
-            CTkButton(challenge_content, text="Start Challenge →",
-                      corner_radius=12, height=40,
-                      fg_color="white",
-                      text_color=colors['primary'],
-                      hover_color=colors['bg_light'],
-                      font=ctk.CTkFont(family=DEFAULT_FONT, size=14, weight="bold"),
-                      command=self.on_daily_challenge).pack(anchor='w')
-        else:
-            CTkLabel(challenge_content,
-                     text="Completed! Come back tomorrow for a new challenge.",
-                     font=ctk.CTkFont(family=DEFAULT_FONT, size=13),
-                     text_color="white").pack(anchor='w', pady=(8, 0))
-
-        # Recent Activity with better styling
-        if self.user.activity_log:
-            activity_frame = CTkFrame(self, corner_radius=20, fg_color=colors['bg_dark'],
-                                      border_width=2, border_color=colors['bg_light'])
-            activity_frame.pack(fill='both', expand=True, pady=(0, 15))
-
-            header = CTkFrame(activity_frame, fg_color=colors['bg_medium'],
-                              corner_radius=18)
-            header.pack(fill='x', padx=2, pady=2)
-
-            CTkLabel(header, text="📜 Recent Activity",
-                     font=ctk.CTkFont(family=DEFAULT_FONT, size=16, weight="bold")).pack(anchor='w', padx=20, pady=15)
-
-            # Show last 5 activities
-            for idx, activity in enumerate(self.user.activity_log[-5:][::-1]):
-                activity_item = CTkFrame(activity_frame,
-                                         fg_color=colors['bg_medium'] if idx % 2 == 0 else "transparent",
-                                         corner_radius=10)
-                activity_item.pack(fill='x', padx=15, pady=2)
-
-                desc_text = f"• {activity['description']}"
-                if activity['xp_gained'] > 0:
-                    desc_text += f"  (+{activity['xp_gained']} XP)"
-
-                CTkLabel(activity_item, text=desc_text,
-                         font=ctk.CTkFont(family=DEFAULT_FONT, size=12),
-                         anchor='w').pack(anchor='w', padx=15, pady=10, fill='x')
-
-        # Enhanced tips section
-        tips = [
-            "💡 Maintain your streak to help your companion evolve!",
-            "💡 Complete lessons to unlock new content and skills.",
-            "💡 Use hints wisely - solving problems yourself builds confidence!",
-            "💡 Review completed lessons to reinforce your learning.",
-            "💡 Try the daily challenge for bonus XP and practice!",
-            "💡 Experiment with the code - breaking things helps you learn!",
-        ]
-
-        tips_frame = CTkFrame(self, corner_radius=20, fg_color=colors['accent'])
-        tips_frame.pack(fill='x')
-
-        CTkLabel(tips_frame, text=random.choice(tips),
-                 wraplength=750, justify="left",
-                 text_color="white",
-                 font=ctk.CTkFont(family=DEFAULT_FONT, size=13)).pack(padx=20, pady=18)
 
 
 class DailyChallengeView(CTkFrame):
@@ -3265,121 +3047,645 @@ class CodeCompanionApp:
                             f"Welcome, {username}! Your {companion_type} companion awaits. Let's start learning Python!")
 
     def _create_ui(self):
-        """Create main application interface"""
+        """Create main application interface - REDESIGNED"""
         colors = get_colors()
 
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        # Main container
-        main_container = CTkFrame(self.root, fg_color="transparent")
-        main_container.pack(fill='both', expand=True)
+        # ===== TOP NAVIGATION BAR =====
+        nav_bar = CTkFrame(self.root, height=70, corner_radius=0, fg_color=colors['bg_dark'])
+        nav_bar.pack(fill='x', side='top')
+        nav_bar.pack_propagate(False)
 
-        # Left sidebar (300px fixed width)
-        sidebar = CTkFrame(main_container, width=300, corner_radius=0,
-                           fg_color=colors['bg_medium'])
-        sidebar.pack(side='left', fill='y')
-        sidebar.pack_propagate(False)
+        # Left side - Logo and title
+        left_section = CTkFrame(nav_bar, fg_color="transparent")
+        left_section.pack(side='left', padx=20, pady=15)
 
-        # Companion view in sidebar
-        companion_view = CompanionView(sidebar, self.user,
-                                       on_switch_companion=self._show_companion_switcher)
-        companion_view.pack(pady=20, padx=10)
+        CTkLabel(left_section, text="🌱 CodeCompanion",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=24, weight="bold"),
+                 text_color=colors['primary']).pack(side='left')
 
-        # Navigation buttons
-        nav_frame = CTkFrame(sidebar, fg_color="transparent")
-        nav_frame.pack(fill='x', padx=10, pady=10)
+        # Center - Compact stats bar
+        stats_section = CTkFrame(nav_bar, fg_color=colors['bg_medium'], corner_radius=35, height=50)
+        stats_section.pack(side='left', padx=40, pady=10)
+        stats_section.pack_propagate(False)
 
-        nav_buttons = [
-            ("🏠 Dashboard", self._show_dashboard),
-            ("📊 Statistics", self._show_statistics),
-            ("⚙️ Settings", self._show_settings),
+        # Compact stats
+        compact_stats = [
+            ("🔥", f"{self.user.streak_days}d"),
+            ("⭐", f"Lv.{self.user.level}"),
+            ("💎", f"{self.user.xp}"),
+            ("📚", f"{len(self.user.completed_lessons)}/{len(ContentEngine.get_all_lessons())}"),
         ]
 
-        for text, command in nav_buttons:
-            btn = CTkButton(nav_frame, text=text, corner_radius=12,
-                            fg_color="transparent",
-                            hover_color=colors['primary'],
-                            anchor='w', height=42,
-                            font=ctk.CTkFont(family=DEFAULT_FONT, size=13, weight="bold"),
-                            command=command)
-            btn.pack(fill='x', pady=4)
+        for icon, value in compact_stats:
+            stat_container = CTkFrame(stats_section, fg_color="transparent")
+            stat_container.pack(side='left', padx=15)
+            
+            CTkLabel(stat_container, text=icon, font=ctk.CTkFont(size=18)).pack(side='left', padx=(0, 5))
+            CTkLabel(stat_container, text=value,
+                     font=ctk.CTkFont(family=DEFAULT_FONT, size=14, weight="bold")).pack(side='left')
 
-        # Lessons section with enhanced header
-        lessons_header = CTkFrame(sidebar, corner_radius=12, fg_color=colors['primary'])
-        lessons_header.pack(fill='x', padx=10, pady=(25, 10))
+        # Right side - Quick actions
+        right_section = CTkFrame(nav_bar, fg_color="transparent")
+        right_section.pack(side='right', padx=20, pady=15)
 
-        CTkLabel(lessons_header, text="📚 Lessons",
-                 font=ctk.CTkFont(family=DEFAULT_FONT, size=15, weight="bold"),
-                 text_color="white").pack(pady=12)
+        # Companion status indicator (compact)
+        companion = Companion(CompanionType(self.user.companion_type),
+                            self.user.companion_stage, self.user.companion_vitality)
+        
+        companion_btn = CTkButton(right_section,
+                                  text=f"{companion.get_name()} • {self.user.companion_vitality}%",
+                                  corner_radius=20, height=40, width=200,
+                                  fg_color=colors['bg_medium'],
+                                  hover_color=colors['bg_light'],
+                                  font=ctk.CTkFont(family=DEFAULT_FONT, size=12),
+                                  command=self._show_companion_detail)
+        companion_btn.pack(side='right', padx=5)
 
-        lessons_frame = CTkScrollableFrame(sidebar, corner_radius=12,
-                                           fg_color=colors['bg_dark'])
-        lessons_frame.pack(fill='both', expand=True, padx=10, pady=(0, 10))
+        # Settings button
+        settings_btn = CTkButton(right_section, text="⚙️", corner_radius=20,
+                                width=40, height=40,
+                                fg_color=colors['bg_medium'],
+                                hover_color=colors['primary'],
+                                font=ctk.CTkFont(size=18),
+                                command=self._show_settings)
+        settings_btn.pack(side='right', padx=5)
 
-        # Render lessons with better visual hierarchy
-        all_lessons = ContentEngine.get_all_lessons()
-        for lesson in all_lessons:
-            completed = lesson.id in self.user.completed_lessons
-            prerequisites_satisfied = all(pr in self.user.completed_lessons
-                                          for pr in lesson.prerequisites)
-            locked = not prerequisites_satisfied and not completed
+        # ===== MAIN CONTENT AREA =====
+        main_container = CTkFrame(self.root, fg_color="transparent")
+        main_container.pack(fill='both', expand=True, padx=20, pady=10)
 
-            if completed:
-                btn = CTkButton(lessons_frame, text=f"✓ {lesson.title}",
-                                corner_radius=10, fg_color=colors['success'],
-                                hover_color=colors['success_hover'],
-                                text_color="white",
-                                anchor='w', height=40,
-                                font=ctk.CTkFont(family=DEFAULT_FONT, size=12, weight="bold"),
-                                command=lambda l=lesson: self._start_lesson(l))
-                btn.pack(fill='x', pady=4, padx=4)
-            elif locked:
-                lock_frame = CTkFrame(lessons_frame, corner_radius=10,
-                                      fg_color=colors['bg_medium'])
-                lock_frame.pack(fill='x', pady=4, padx=4)
+        # ===== SECTION TABS (Modern) =====
+        tab_frame = CTkFrame(main_container, fg_color="transparent", height=50)
+        tab_frame.pack(fill='x', pady=(0, 15))
+        tab_frame.pack_propagate(False)
 
-                CTkLabel(lock_frame, text=f"🔒 {lesson.title}",
-                         anchor='w', text_color=colors['text_secondary'],
-                         font=ctk.CTkFont(family=DEFAULT_FONT, size=12)).pack(side='left', padx=12, pady=10)
-            else:
-                btn = CTkButton(lessons_frame, text=f"▶ {lesson.title}",
-                                corner_radius=10, fg_color=colors['primary'],
-                                hover_color=colors['primary_hover'],
-                                text_color="white",
-                                anchor='w', height=40,
-                                font=ctk.CTkFont(family=DEFAULT_FONT, size=12),
-                                command=lambda l=lesson: self._start_lesson(l))
-                btn.pack(fill='x', pady=4, padx=4)
+        self.active_tab = "lessons"
+        tab_buttons = {
+            "lessons": "📚 Lessons",
+            "daily": "⭐ Daily Challenge",
+            "stats": "📊 Progress",
+        }
 
-        # Right content area
-        self.content_area = CTkFrame(main_container, corner_radius=20,
-                                     fg_color="transparent")
-        self.content_area.pack(side='left', fill='both', expand=True, padx=10, pady=10)
+        self.tab_button_refs = {}
+        for tab_id, tab_text in tab_buttons.items():
+            is_active = tab_id == self.active_tab
+            btn = CTkButton(tab_frame, text=tab_text,
+                           corner_radius=15, height=50,
+                           fg_color=colors['primary'] if is_active else colors['bg_medium'],
+                           hover_color=colors['primary_hover'],
+                           font=ctk.CTkFont(family=DEFAULT_FONT, size=15, weight="bold" if is_active else "normal"),
+                           command=lambda t=tab_id: self._switch_tab(t))
+            btn.pack(side='left', padx=5, fill='x', expand=True)
+            self.tab_button_refs[tab_id] = btn
 
-        # Header
-        self.header_frame = CTkFrame(self.content_area, corner_radius=15,
-                                     fg_color=colors['bg_dark'])
-        self.header_frame.pack(fill='x', pady=(0, 10))
-
-        header_inner = CTkFrame(self.header_frame, fg_color="transparent")
-        header_inner.pack(fill='x', padx=20, pady=14)
-
-        self.header_title = CTkLabel(header_inner, text="Dashboard",
-                                     font=ctk.CTkFont(size=20, weight="bold"))
-        self.header_title.pack(side='left')
-
-        # Content body
-        self.content_body = CTkFrame(self.content_area, corner_radius=15,
-                                     fg_color="transparent")
+        # ===== CONTENT BODY (Scrollable) =====
+        self.content_body = CTkScrollableFrame(main_container, corner_radius=15,
+                                               fg_color="transparent")
         self.content_body.pack(fill='both', expand=True)
 
-        # Show dashboard initially
-        self._show_dashboard()
+        # Show lessons by default
+        self._show_lessons_grid()
+
+    def _switch_tab(self, tab_id: str):
+        """Switch between main tabs - FAST (cached views) with smooth scroll"""
+        colors = get_colors()
+        
+        # Update button styles
+        for tid, btn in self.tab_button_refs.items():
+            if tid == tab_id:
+                btn.configure(fg_color=colors['primary'],
+                             font=ctk.CTkFont(family=DEFAULT_FONT, size=15, weight="bold"))
+            else:
+                btn.configure(fg_color=colors['bg_medium'],
+                             font=ctk.CTkFont(family=DEFAULT_FONT, size=15, weight="normal"))
+        
+        self.active_tab = tab_id
+        
+        # Hide all cached views
+        if hasattr(self, 'cached_views'):
+            for view_name, view in self.cached_views.items():
+                view.pack_forget()
+        
+        # Show or create the requested view
+        if not hasattr(self, 'cached_views'):
+            self.cached_views = {}
+        
+        if tab_id not in self.cached_views:
+            # Create new cached view
+            if tab_id == "lessons":
+                self.cached_views[tab_id] = self._create_lessons_view_cached()
+            elif tab_id == "daily":
+                self.cached_views[tab_id] = self._create_daily_view_cached()
+            elif tab_id == "stats":
+                self.cached_views[tab_id] = self._create_stats_view_cached()
+        
+        # Show the cached view
+        if tab_id in self.cached_views:
+            self.cached_views[tab_id].pack(fill='both', expand=True)
+            
+            # Smooth scroll to top when switching tabs
+            self._smooth_scroll_to_top(self.cached_views[tab_id])
+    
+    def _smooth_scroll_to_top(self, view):
+        """Smoothly scroll a view to the top"""
+        # Find the scrollable frame within the view
+        scrollable = None
+        for child in view.winfo_children():
+            if isinstance(child, CTkScrollableFrame):
+                scrollable = child
+                break
+        
+        if scrollable is None:
+            return
+        
+        # Get current scroll position
+        try:
+            current_pos = scrollable._parent_canvas.yview()[0]
+        except:
+            return
+        
+        # Animate to top
+        steps = 10
+        duration = 200  # milliseconds
+        delay = duration // steps
+        
+        def animate_step(step):
+            if step >= steps:
+                return
+            
+            # Ease out animation
+            progress = step / steps
+            eased_progress = 1 - (1 - progress) ** 3  # Cubic ease out
+            
+            target_pos = current_pos * (1 - eased_progress)
+            
+            try:
+                scrollable._parent_canvas.yview_moveto(target_pos)
+                self.root.after(delay, lambda: animate_step(step + 1))
+            except:
+                pass
+        
+        # Only animate if not already at top
+        if current_pos > 0.01:
+            animate_step(0)
+    
+    def _create_lessons_view_cached(self):
+        """Create lessons view once and cache it"""
+        view = CTkFrame(self.content_body.master, fg_color="transparent")
+        scrollable = CTkScrollableFrame(view, corner_radius=15, fg_color="transparent")
+        scrollable.pack(fill='both', expand=True)
+        self._show_lessons_grid_in(scrollable)
+        return view
+    
+    def _create_daily_view_cached(self):
+        """Create daily challenge view once and cache it"""
+        view = CTkFrame(self.content_body.master, fg_color="transparent")
+        scrollable = CTkScrollableFrame(view, corner_radius=15, fg_color="transparent")
+        scrollable.pack(fill='both', expand=True)
+        self._show_daily_challenge_card_in(scrollable)
+        return view
+    
+    def _create_stats_view_cached(self):
+        """Create stats view once and cache it"""
+        view = CTkFrame(self.content_body.master, fg_color="transparent")
+        scrollable = CTkScrollableFrame(view, corner_radius=15, fg_color="transparent")
+        scrollable.pack(fill='both', expand=True)
+        self._show_statistics_modern_in(scrollable)
+        return view
+
+    def _show_lessons_grid(self):
+        """Show lessons in content_body"""
+        self._show_lessons_grid_in(self.content_body)
+    
+    def _show_lessons_grid_in(self, parent):
+        """Show lessons in a beautiful grid layout"""
+        colors = get_colors()
+
+        # Welcome header
+        header = CTkFrame(parent, fg_color="transparent")
+        header.pack(fill='x', pady=(0, 20))
+
+        CTkLabel(header, text=f"Welcome back, {self.user.username}! 👋",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=28, weight="bold")).pack(anchor='w')
+
+        # Daily goal progress
+        goal_frame = CTkFrame(header, fg_color=colors['bg_dark'], corner_radius=15, height=80)
+        goal_frame.pack(fill='x', pady=(10, 0))
+        goal_frame.pack_propagate(False)
+
+        goal_content = CTkFrame(goal_frame, fg_color="transparent")
+        goal_content.pack(fill='both', expand=True, padx=20, pady=15)
+
+        CTkLabel(goal_content, 
+                 text=f"Daily Goal: {self.user.today_xp}/{self.user.daily_goal_xp} XP",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=14, weight="bold")).pack(anchor='w')
+
+        progress = CTkProgressBar(goal_content, corner_radius=10, height=14,
+                                 progress_color=colors['success'])
+        progress.set(min(self.user.today_xp / self.user.daily_goal_xp, 1.0))
+        progress.pack(fill='x', pady=(8, 0))
+
+        # Section: Learning Paths
+        CTkLabel(parent, text="📖 Your Learning Journey",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=22, weight="bold")).pack(anchor='w', pady=(20, 15))
+
+        # Group lessons by skill path
+        skill_paths = ContentEngine.get_skill_paths()
+        
+        for path_name, path_lessons in skill_paths.items():
+            # Path header with progress
+            path_header = CTkFrame(parent, fg_color=colors['bg_dark'],
+                                  corner_radius=15, height=60)
+            path_header.pack(fill='x', pady=(0, 10))
+            path_header.pack_propagate(False)
+
+            header_content = CTkFrame(path_header, fg_color="transparent")
+            header_content.pack(fill='both', padx=20, pady=15)
+
+            # Path name
+            path_display_name = path_name.replace('_', ' ').title()
+            completed_count = sum(1 for l in path_lessons if l.id in self.user.completed_lessons)
+            total_count = len(path_lessons)
+
+            CTkLabel(header_content,
+                     text=f"🎯 {path_display_name}",
+                     font=ctk.CTkFont(family=DEFAULT_FONT, size=18, weight="bold")).pack(side='left')
+
+            CTkLabel(header_content,
+                     text=f"{completed_count}/{total_count} completed",
+                     font=ctk.CTkFont(family=DEFAULT_FONT, size=12),
+                     text_color=colors['text_secondary']).pack(side='right')
+
+            # Lessons in grid (3 columns)
+            grid_container = CTkFrame(parent, fg_color="transparent")
+            grid_container.pack(fill='x', pady=(0, 30))
+
+            # Configure grid
+            for i in range(3):
+                grid_container.grid_columnconfigure(i, weight=1, uniform="lesson")
+
+            row, col = 0, 0
+            for lesson in path_lessons:
+                lesson_card = self._create_lesson_card(grid_container, lesson)
+                lesson_card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
+
+                col += 1
+                if col >= 3:
+                    col = 0
+                    row += 1
+
+    def _create_lesson_card(self, parent, lesson: Lesson):
+        """Create a beautiful lesson card"""
+        colors = get_colors()
+
+        completed = lesson.id in self.user.completed_lessons
+        prerequisites_satisfied = all(pr in self.user.completed_lessons for pr in lesson.prerequisites)
+        locked = not prerequisites_satisfied and not completed
+
+        # Card styling based on status
+        if completed:
+            card_color = colors['success']
+            border_color = colors['success']
+            text_color = "white"
+            status_icon = "✓"
+        elif locked:
+            card_color = colors['bg_medium']
+            border_color = colors['bg_light']
+            text_color = colors['text_secondary']
+            status_icon = "🔒"
+        else:
+            card_color = colors['primary']
+            border_color = colors['primary']
+            text_color = "white"
+            status_icon = "▶"
+
+        # Main card
+        card = CTkFrame(parent, corner_radius=20, fg_color=card_color,
+                       border_width=3, border_color=border_color, height=200)
+        card.pack_propagate(False)
+
+        # Make ENTIRE card clickable if available
+        if not locked:
+            def make_clickable(widget):
+                """Recursively bind click to widget and all descendants"""
+                # Bind to the CTk widget
+                try:
+                    widget.bind("<Button-1>", lambda e: self._start_lesson(lesson), add="+")
+                except:
+                    pass
+                
+                # Bind to underlying tkinter canvas/frame if it exists
+                try:
+                    if hasattr(widget, '_canvas'):
+                        widget._canvas.bind("<Button-1>", lambda e: self._start_lesson(lesson), add="+")
+                except:
+                    pass
+                
+                # Bind to underlying tkinter text widget if it exists  
+                try:
+                    if hasattr(widget, '_textbox'):
+                        widget._textbox.bind("<Button-1>", lambda e: self._start_lesson(lesson), add="+")
+                except:
+                    pass
+                
+                # Bind to label widget if it exists
+                try:
+                    if hasattr(widget, '_label'):
+                        widget._label.bind("<Button-1>", lambda e: self._start_lesson(lesson), add="+")
+                except:
+                    pass
+                
+                # Recursively bind to all children
+                try:
+                    for child in widget.winfo_children():
+                        make_clickable(child)
+                except:
+                    pass
+            
+            def set_cursor(widget, cursor_type):
+                """Recursively set cursor for widget and all descendants"""
+                try:
+                    widget.configure(cursor=cursor_type)
+                except:
+                    pass
+                try:
+                    if hasattr(widget, '_canvas'):
+                        widget._canvas.configure(cursor=cursor_type)
+                except:
+                    pass
+                try:
+                    if hasattr(widget, '_label'):
+                        widget._label.configure(cursor=cursor_type)
+                except:
+                    pass
+                try:
+                    for child in widget.winfo_children():
+                        set_cursor(child, cursor_type)
+                except:
+                    pass
+            
+            # Bind clicks
+            make_clickable(card)
+            
+            # Bind hover effects
+            card.bind("<Enter>", lambda e: set_cursor(card, "hand2"))
+            card.bind("<Leave>", lambda e: set_cursor(card, ""))
+
+        content = CTkFrame(card, fg_color="transparent")
+        content.pack(fill='both', expand=True, padx=20, pady=20)
+
+        # Status icon (top right)
+        CTkLabel(content, text=status_icon,
+                 font=ctk.CTkFont(size=24)).pack(anchor='ne')
+
+        # Lesson title
+        CTkLabel(content, text=lesson.title,
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=16, weight="bold"),
+                 text_color=text_color,
+                 wraplength=220).pack(anchor='w', pady=(10, 5))
+
+        # XP reward
+        CTkLabel(content, text=f"💎 {lesson.xp_reward} XP",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=12),
+                 text_color=text_color).pack(anchor='w', pady=(0, 10))
+
+        # Item count
+        total_items = (len(lesson.exercises) + len(lesson.mcq_questions) + 
+                      len(lesson.multi_answer_questions) + len(lesson.output_drills) +
+                      len(lesson.bug_fix_drills))
+        
+        CTkLabel(content, text=f"📝 {total_items} challenges",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=11),
+                 text_color=text_color).pack(anchor='w')
+
+        # Difficulty indicator
+        difficulty_frame = CTkFrame(content, fg_color="transparent")
+        difficulty_frame.pack(anchor='w', pady=(10, 0))
+
+        lesson_difficulty = getattr(lesson, 'difficulty', 1)  # Default to 1 if not present
+        for i in range(3):
+            # Use proper color with opacity
+            if i < lesson_difficulty:
+                indicator_color = text_color
+            else:
+                # Use a dimmed version based on card type
+                if completed:
+                    indicator_color = "#88ff88"  # Light green
+                elif locked:
+                    indicator_color = colors['bg_light']
+                else:
+                    indicator_color = "#6699ff"  # Light blue
+            
+            CTkLabel(difficulty_frame, text="●",
+                    font=ctk.CTkFont(size=14),
+                    text_color=indicator_color).pack(side='left', padx=2)
+
+        return card
+
+    def _show_companion_detail(self):
+        """Show companion in a popup"""
+        colors = get_colors()
+        
+        dialog = CTkToplevel(self.root)
+        dialog.title("Your Companion")
+        dialog.geometry("500x700")
+        dialog.grab_set()
+
+        # Make it pretty
+        main = CTkFrame(dialog, fg_color=colors['bg_dark'], corner_radius=20)
+        main.pack(fill='both', expand=True, padx=20, pady=20)
+
+        companion = Companion(CompanionType(self.user.companion_type),
+                            self.user.companion_stage, self.user.companion_vitality)
+
+        # Header
+        CTkLabel(main, text=companion.get_name(),
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=28, weight="bold")).pack(pady=20)
+
+        # ASCII art
+        art_frame = CTkFrame(main, corner_radius=15, fg_color=colors['bg_medium'],
+                           border_width=3, border_color=colors['primary'])
+        art_frame.pack(pady=20, padx=30, fill='x')
+
+        CTkLabel(art_frame, text=companion.get_ascii(),
+                 font=ctk.CTkFont(family=CODE_FONT, size=18, weight="bold"),
+                 text_color=colors['accent']).pack(pady=40)
+
+        # Stats
+        stats_frame = CTkFrame(main, fg_color=colors['bg_medium'], corner_radius=15)
+        stats_frame.pack(fill='x', padx=30, pady=10)
+
+        # Vitality
+        CTkLabel(stats_frame, text="💚 Health",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=14, weight="bold")).pack(anchor='w', padx=20, pady=(15, 5))
+        
+        vitality_bar = CTkProgressBar(stats_frame, corner_radius=10, height=12,
+                                      progress_color=colors['success'])
+        vitality_bar.set(self.user.companion_vitality / 100)
+        vitality_bar.pack(fill='x', padx=20, pady=(0, 10))
+
+        CTkLabel(stats_frame, text=f"{self.user.companion_vitality}%",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=12)).pack(anchor='w', padx=20, pady=(0, 15))
+
+        # Stage
+        CTkLabel(stats_frame, text=f"⭐ Stage {self.user.companion_stage}/10",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=14)).pack(pady=15)
+
+        # Description
+        CTkLabel(main, text=companion.get_description(),
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=12),
+                 wraplength=400,
+                 text_color=colors['text_secondary']).pack(pady=20, padx=30)
+
+        # Switch button
+        CTkButton(main, text="🔄 Switch Companion Type",
+                  corner_radius=15, height=45,
+                  fg_color=colors['warning'],
+                  font=ctk.CTkFont(family=DEFAULT_FONT, size=13),
+                  command=lambda: [dialog.destroy(), self._show_companion_switcher()]).pack(pady=10, padx=30, fill='x')
+
+        # Close button
+        CTkButton(main, text="Close",
+                  corner_radius=15, height=45,
+                  fg_color=colors['bg_medium'],
+                  command=dialog.destroy).pack(pady=(0, 20), padx=30, fill='x')
+
+    def _show_daily_challenge_card(self):
+        """Show daily challenge in content_body"""
+        self._show_daily_challenge_card_in(self.content_body)
+    
+    def _show_daily_challenge_card_in(self, parent):
+        """Show daily challenge in main area"""
+        colors = get_colors()
+        today = datetime.now().date().isoformat()
+        challenge_completed = self.user.daily_challenge_completed == today
+
+        # Big attractive card
+        card = CTkFrame(parent, corner_radius=25,
+                       fg_color=colors['success'] if challenge_completed else colors['primary'],
+                       height=400)
+        card.pack(fill='x', pady=20)
+        card.pack_propagate(False)
+
+        content = CTkFrame(card, fg_color="transparent")
+        content.pack(fill='both', expand=True, padx=40, pady=40)
+
+        icon = "✅" if challenge_completed else "⭐"
+        CTkLabel(content, text=icon,
+                 font=ctk.CTkFont(size=80)).pack(pady=(20, 10))
+
+        CTkLabel(content, text="Daily Challenge",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=32, weight="bold"),
+                 text_color="white").pack()
+
+        if not challenge_completed:
+            CTkLabel(content,
+                     text="Complete today's challenge for +50 bonus XP!",
+                     font=ctk.CTkFont(family=DEFAULT_FONT, size=16),
+                     text_color="white").pack(pady=(10, 30))
+
+            CTkButton(content, text="Start Challenge →",
+                      corner_radius=15, height=60, width=300,
+                      fg_color="white",
+                      text_color=colors['primary'],
+                      hover_color=colors['bg_light'],
+                      font=ctk.CTkFont(family=DEFAULT_FONT, size=18, weight="bold"),
+                      command=self._start_daily_challenge).pack()
+        else:
+            CTkLabel(content,
+                     text="Completed! Come back tomorrow for a new challenge.",
+                     font=ctk.CTkFont(family=DEFAULT_FONT, size=16),
+                     text_color="white").pack(pady=20)
+
+    def _start_daily_challenge(self):
+        """Start daily challenge (full screen)"""
+        self._clear_content()
+        challenge = DailyChallengeView(self.content_body, self.user,
+                                       on_complete=self._on_daily_challenge_complete,
+                                       on_back=lambda: self._switch_tab("daily"))
+        challenge.pack(fill='both', expand=True)
+
+    def _show_statistics_modern(self):
+        """Show stats in content_body"""
+        self._show_statistics_modern_in(self.content_body)
+    
+    def _show_statistics_modern_in(self, parent):
+        """Modern stats view"""
+        colors = get_colors()
+
+        # Header
+        CTkLabel(parent, text="📊 Your Progress",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=28, weight="bold")).pack(anchor='w', pady=(0, 20))
+
+        # Stats grid
+        stats_grid = CTkFrame(parent, fg_color="transparent")
+        stats_grid.pack(fill='x', pady=10)
+
+        for i in range(4):
+            stats_grid.grid_columnconfigure(i, weight=1, uniform="stat")
+
+        stats_data = [
+            ("💎", "Total XP", f"{self.user.xp}"),
+            ("⭐", "Level", f"{self.user.level}"),
+            ("🔥", "Streak", f"{self.user.streak_days} days"),
+            ("📚", "Lessons", f"{len(self.user.completed_lessons)}"),
+            ("✏️", "Exercises", f"{self.user.total_exercises_completed}"),
+            ("🎯", "Drills", f"{self.user.total_drills_completed}"),
+            ("🐛", "Bugs Fixed", f"{getattr(self.user, 'total_bugs_fixed', 0)}"),
+            ("💡", "Hints Used", f"{self.user.total_hints_used}"),
+        ]
+
+        for idx, (icon, label, value) in enumerate(stats_data):
+            row = idx // 4
+            col = idx % 4
+
+            stat_card = CTkFrame(stats_grid, corner_radius=15, fg_color=colors['bg_dark'],
+                               border_width=2, border_color=colors['bg_light'])
+            stat_card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
+
+            card_content = CTkFrame(stat_card, fg_color="transparent")
+            card_content.pack(fill='both', expand=True, padx=20, pady=20)
+
+            CTkLabel(card_content, text=icon,
+                     font=ctk.CTkFont(size=32)).pack(pady=(0, 10))
+            
+            CTkLabel(card_content, text=value,
+                     font=ctk.CTkFont(family=DEFAULT_FONT, size=24, weight="bold")).pack()
+            
+            CTkLabel(card_content, text=label,
+                     font=ctk.CTkFont(family=DEFAULT_FONT, size=11),
+                     text_color=colors['text_secondary']).pack(pady=(5, 0))
+
+        # Achievements section
+        if self.user.achievements:
+            CTkLabel(parent, text="🏆 Achievements",
+                     font=ctk.CTkFont(family=DEFAULT_FONT, size=22, weight="bold")).pack(anchor='w', pady=(30, 15))
+
+            ach_grid = CTkFrame(parent, fg_color="transparent")
+            ach_grid.pack(fill='x')
+
+            for i in range(3):
+                ach_grid.grid_columnconfigure(i, weight=1, uniform="ach")
+
+            for idx, achievement in enumerate(self.user.achievements):
+                row = idx // 3
+                col = idx % 3
+
+                ach_card = CTkFrame(ach_grid, corner_radius=15, fg_color=colors['warning'],
+                                  height=80)
+                ach_card.grid(row=row, column=col, padx=10, pady=10, sticky="ew")
+                ach_card.pack_propagate(False)
+
+                CTkLabel(ach_card, text=f"🏆 {achievement}",
+                        font=ctk.CTkFont(family=DEFAULT_FONT, size=13, weight="bold"),
+                        text_color="white").pack(pady=30)
 
     def _set_content_title(self, title: str):
-        """Update header title"""
-        self.header_title.configure(text=title)
+        """Update header title - Not used in new UI"""
+        pass
 
     def _clear_content(self):
         """Clear content body"""
@@ -3388,36 +3694,82 @@ class CodeCompanionApp:
 
     def _refresh_current_view(self):
         """Refresh the current view to reflect updated data"""
-        self._show_dashboard()
+        # Recreate entire UI to refresh everything
+        self._create_ui()
 
     def _show_dashboard(self):
-        self._clear_content()
-        self._set_content_title("Dashboard")
-        dashboard = DashboardView(self.content_body, self.user,
-                                  self._start_lesson, self._show_daily_challenge)
-        dashboard.pack(fill='both', expand=True)
+        """Redirect to lessons tab"""
+        if hasattr(self, 'active_tab'):
+            self._switch_tab("lessons")
 
-    def _show_daily_challenge(self):
-        self._clear_content()
-        self._set_content_title("Daily Challenge")
-        challenge = DailyChallengeView(self.content_body, self.user,
-                                       on_complete=self._on_daily_challenge_complete,
-                                       on_back=self._show_dashboard)
-        challenge.pack(fill='both', expand=True)
+    def _show_statistics(self):
+        """Redirect to stats tab"""
+        if hasattr(self, 'active_tab'):
+            self._switch_tab("stats")
+
+    def _show_settings(self):
+        """Show settings in a modal dialog"""
+        colors = get_colors()
+        
+        dialog = CTkToplevel(self.root)
+        dialog.title("Settings")
+        dialog.geometry("800x700")
+        dialog.grab_set()
+
+        # Settings view
+        settings = SettingsView(dialog, self.user,
+                                on_theme_change=self._change_theme,
+                                on_font_save=self._save_font,
+                                on_goal_save=self._save_goal,
+                                on_switch_companion=lambda: [dialog.destroy(), self._show_companion_switcher()],
+                                on_export=self._export_data,
+                                on_import=self._import_data,
+                                on_reset=self._reset_progress,
+                                on_check_updates=self._check_for_updates)
+        settings.pack(fill='both', expand=True, padx=10, pady=10)
 
     def _on_daily_challenge_complete(self):
+        """Handle daily challenge completion"""
         self.storage.save_user(self.user)
-        self._show_dashboard()
+        self._switch_tab("daily")
 
     def _start_lesson(self, lesson: Lesson):
-        self._clear_content()
-        self._set_content_title(lesson.title)
-        lesson_view = LessonView(self.content_body, self.user, lesson,
+        """Start a lesson - full screen takeover"""
+        # Clear everything and show lesson
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        # Create back navigation
+        top_bar = CTkFrame(self.root, height=60, fg_color=get_colors()['bg_dark'])
+        top_bar.pack(fill='x')
+        top_bar.pack_propagate(False)
+
+        CTkButton(top_bar, text="← Back to Lessons",
+                  corner_radius=10, width=150, height=40,
+                  fg_color=get_colors()['bg_medium'],
+                  hover_color=get_colors()['primary'],
+                  font=ctk.CTkFont(family=DEFAULT_FONT, size=13),
+                  command=lambda: self._on_lesson_exit(lesson)).pack(side='left', padx=20, pady=10)
+
+        CTkLabel(top_bar, text=lesson.title,
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=18, weight="bold")).pack(side='left', padx=20)
+
+        # Lesson content
+        lesson_container = CTkFrame(self.root, fg_color="transparent")
+        lesson_container.pack(fill='both', expand=True, padx=20, pady=10)
+
+        lesson_view = LessonView(lesson_container, self.user, lesson,
                                  on_complete=lambda l=lesson: self._on_lesson_complete(l),
-                                 on_back=self._show_dashboard)
+                                 on_back=lambda: self._on_lesson_exit(lesson))
         lesson_view.pack(fill='both', expand=True)
 
+    def _on_lesson_exit(self, lesson: Lesson):
+        """Handle exiting a lesson"""
+        self.storage.save_user(self.user)
+        self._create_ui()
+
     def _on_lesson_complete(self, lesson: Lesson):
+        """Handle lesson completion"""
         self.user.completed_lessons.add(lesson.id)
         self.storage.save_user(self.user)
 
@@ -3428,40 +3780,18 @@ class CodeCompanionApp:
                                 f"🏆 {', '.join(new_achievements)}")
             self.storage.save_user(self.user)
 
-        # FIXED: Refresh the entire UI to update sidebar lesson list
+        # Refresh UI
         self._create_ui()
 
-        # Show next available lesson or dashboard
+        # Show next available lesson or go back
         available = ContentEngine.get_available_lessons(self.user.completed_lessons)
         if available:
-            if messagebox.askyesno("Lesson Complete!",
+            if messagebox.askyesno("Lesson Complete! 🎉",
                                    "Great job! Continue to next lesson?"):
                 self._start_lesson(available[0])
-            else:
-                self._show_dashboard()
         else:
-            messagebox.showinfo("Amazing!", "You've completed all available lessons!")
-            self._show_dashboard()
+            messagebox.showinfo("Amazing!", "You've completed all available lessons! 🏆")
 
-    def _show_statistics(self):
-        self._clear_content()
-        self._set_content_title("Statistics")
-        stats = StatisticsView(self.content_body, self.user)
-        stats.pack(fill='both', expand=True)
-
-    def _show_settings(self):
-        self._clear_content()
-        self._set_content_title("Settings")
-        settings = SettingsView(self.content_body, self.user,
-                                on_theme_change=self._change_theme,
-                                on_font_save=self._save_font,
-                                on_goal_save=self._save_goal,
-                                on_switch_companion=self._show_companion_switcher,
-                                on_export=self._export_data,
-                                on_import=self._import_data,
-                                on_reset=self._reset_progress,
-                                on_check_updates=self._check_for_updates)
-        settings.pack(fill='both', expand=True)
 
     # FIXED: Implement update check
     def _check_for_updates(self):
