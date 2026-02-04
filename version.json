@@ -1,16 +1,22 @@
 {
-  "version": "3.1.2",
+  "version": "3.2.0",
   "download_url": "https://github.com/hulkingburst/codecompanion/releases/latest/download/codecompanion.py",
-  "release_notes": "🎯 FIXED: Cards now 100% clickable everywhere! Click any part of lesson cards.",
+  "release_notes": "🔄 MAJOR AUTO-UPDATE IMPROVEMENTS!\n\n✨ Beautiful update dialogs with progress bars\n📥 Automatic download system\n⚡ Background checking (non-blocking)\n🎯 Comprehensive error handling\n✅ Manual check button in settings\n🖱️ Fully clickable lesson cards\n💫 Smooth animations everywhere\n\nUpdate experience is now professional and polished!",
   "changelog": [
-    "🎯 Cards now use CTkButton for complete clickability",
-    "🖱️ Every label binds click events - no dead zones!",
-    "✨ Smooth scroll animations when switching tabs",
-    "⚡ Cached views for instant tab switching",
-    "🎨 Complete UI redesign - Lessons front and center",
-    "🐛 Bug Fixing Drills - Learn debugging skills",
-    "🔄 Auto-update system built-in",
-    "🏆 New achievements for bug fixing"
+    "🔄 Complete auto-update system rebuild",
+    "📥 Automatic file download with progress",
+    "✨ Beautiful update notification dialogs",
+    "⚡ Background update checking (non-blocking)",
+    "🎯 Comprehensive error handling and feedback",
+    "✅ Manual 'Check for Updates' button",
+    "📊 Real-time download progress indicator",
+    "📁 Automatic file location opening",
+    "🖱️ 100% clickable lesson cards (FIXED)",
+    "💫 Smooth scroll animations",
+    "⚡ Cached views for instant tabs",
+    "🎨 Modern card-based UI",
+    "🐛 Bug fixing drills",
+    "🏆 New achievements"
   ],
   "min_python_version": "3.8",
   "release_date": "2024-01-15"
