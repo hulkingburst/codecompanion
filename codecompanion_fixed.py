@@ -32,7 +32,7 @@ from customtkinter import (CTk, CTkFrame, CTkLabel, CTkButton, CTkEntry,
 # VERSION & UPDATE SYSTEM
 # ============================================================================
 
-CURRENT_VERSION = "3.1.1"  # Fixed: Entire card clickable + smooth scroll animations!
+CURRENT_VERSION = "3.1.2"  # Fixed: Cards now use buttons for 100% clickability!
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/hulkingburst/codecompanion/main/version.json"
 DOWNLOAD_URL = "https://github.com/hulkingburst/codecompanion/releases/latest"
 
@@ -3362,126 +3362,94 @@ class CodeCompanionApp:
             text_color = "white"
             status_icon = "▶"
 
-        # Main card
-        card = CTkFrame(parent, corner_radius=20, fg_color=card_color,
-                       border_width=3, border_color=border_color, height=200)
-        card.pack_propagate(False)
-
-        # Make ENTIRE card clickable if available
-        if not locked:
-            def make_clickable(widget):
-                """Recursively bind click to widget and all descendants"""
-                # Bind to the CTk widget
-                try:
-                    widget.bind("<Button-1>", lambda e: self._start_lesson(lesson), add="+")
-                except:
-                    pass
-                
-                # Bind to underlying tkinter canvas/frame if it exists
-                try:
-                    if hasattr(widget, '_canvas'):
-                        widget._canvas.bind("<Button-1>", lambda e: self._start_lesson(lesson), add="+")
-                except:
-                    pass
-                
-                # Bind to underlying tkinter text widget if it exists  
-                try:
-                    if hasattr(widget, '_textbox'):
-                        widget._textbox.bind("<Button-1>", lambda e: self._start_lesson(lesson), add="+")
-                except:
-                    pass
-                
-                # Bind to label widget if it exists
-                try:
-                    if hasattr(widget, '_label'):
-                        widget._label.bind("<Button-1>", lambda e: self._start_lesson(lesson), add="+")
-                except:
-                    pass
-                
-                # Recursively bind to all children
-                try:
-                    for child in widget.winfo_children():
-                        make_clickable(child)
-                except:
-                    pass
-            
-            def set_cursor(widget, cursor_type):
-                """Recursively set cursor for widget and all descendants"""
-                try:
-                    widget.configure(cursor=cursor_type)
-                except:
-                    pass
-                try:
-                    if hasattr(widget, '_canvas'):
-                        widget._canvas.configure(cursor=cursor_type)
-                except:
-                    pass
-                try:
-                    if hasattr(widget, '_label'):
-                        widget._label.configure(cursor=cursor_type)
-                except:
-                    pass
-                try:
-                    for child in widget.winfo_children():
-                        set_cursor(child, cursor_type)
-                except:
-                    pass
-            
-            # Bind clicks
-            make_clickable(card)
-            
-            # Bind hover effects
-            card.bind("<Enter>", lambda e: set_cursor(card, "hand2"))
-            card.bind("<Leave>", lambda e: set_cursor(card, ""))
-
+        # Main card - use a button instead of frame for full clickability!
+        card = CTkButton(
+            parent, 
+            text="",  # No text on button itself
+            corner_radius=20, 
+            fg_color=card_color,
+            hover_color=card_color if locked else (colors['success_hover'] if completed else colors['primary_hover']),
+            border_width=3, 
+            border_color=border_color, 
+            height=200,
+            cursor="hand2" if not locked else "arrow",
+            command=lambda: self._start_lesson(lesson) if not locked else None
+        )
+        
+        # Create content frame on top of button
         content = CTkFrame(card, fg_color="transparent")
         content.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        # Make content frame not block clicks - pass through to button
+        content.configure(cursor="hand2" if not locked else "arrow")
+        if not locked:
+            content.bind("<Button-1>", lambda e: self._start_lesson(lesson))
 
         # Status icon (top right)
-        CTkLabel(content, text=status_icon,
-                 font=ctk.CTkFont(size=24)).pack(anchor='ne')
+        icon_label = CTkLabel(content, text=status_icon, font=ctk.CTkFont(size=24))
+        icon_label.pack(anchor='ne')
+        if not locked:
+            icon_label.configure(cursor="hand2")
+            icon_label.bind("<Button-1>", lambda e: self._start_lesson(lesson))
 
         # Lesson title
-        CTkLabel(content, text=lesson.title,
-                 font=ctk.CTkFont(family=DEFAULT_FONT, size=16, weight="bold"),
-                 text_color=text_color,
-                 wraplength=220).pack(anchor='w', pady=(10, 5))
+        title_label = CTkLabel(content, text=lesson.title,
+                               font=ctk.CTkFont(family=DEFAULT_FONT, size=16, weight="bold"),
+                               text_color=text_color,
+                               wraplength=220)
+        title_label.pack(anchor='w', pady=(10, 5))
+        if not locked:
+            title_label.configure(cursor="hand2")
+            title_label.bind("<Button-1>", lambda e: self._start_lesson(lesson))
 
         # XP reward
-        CTkLabel(content, text=f"💎 {lesson.xp_reward} XP",
-                 font=ctk.CTkFont(family=DEFAULT_FONT, size=12),
-                 text_color=text_color).pack(anchor='w', pady=(0, 10))
+        xp_label = CTkLabel(content, text=f"💎 {lesson.xp_reward} XP",
+                            font=ctk.CTkFont(family=DEFAULT_FONT, size=12),
+                            text_color=text_color)
+        xp_label.pack(anchor='w', pady=(0, 10))
+        if not locked:
+            xp_label.configure(cursor="hand2")
+            xp_label.bind("<Button-1>", lambda e: self._start_lesson(lesson))
 
         # Item count
         total_items = (len(lesson.exercises) + len(lesson.mcq_questions) + 
                       len(lesson.multi_answer_questions) + len(lesson.output_drills) +
                       len(lesson.bug_fix_drills))
         
-        CTkLabel(content, text=f"📝 {total_items} challenges",
-                 font=ctk.CTkFont(family=DEFAULT_FONT, size=11),
-                 text_color=text_color).pack(anchor='w')
+        challenges_label = CTkLabel(content, text=f"📝 {total_items} challenges",
+                                    font=ctk.CTkFont(family=DEFAULT_FONT, size=11),
+                                    text_color=text_color)
+        challenges_label.pack(anchor='w')
+        if not locked:
+            challenges_label.configure(cursor="hand2")
+            challenges_label.bind("<Button-1>", lambda e: self._start_lesson(lesson))
 
         # Difficulty indicator
         difficulty_frame = CTkFrame(content, fg_color="transparent")
         difficulty_frame.pack(anchor='w', pady=(10, 0))
+        if not locked:
+            difficulty_frame.configure(cursor="hand2")
+            difficulty_frame.bind("<Button-1>", lambda e: self._start_lesson(lesson))
 
-        lesson_difficulty = getattr(lesson, 'difficulty', 1)  # Default to 1 if not present
+        lesson_difficulty = getattr(lesson, 'difficulty', 1)
         for i in range(3):
-            # Use proper color with opacity
             if i < lesson_difficulty:
                 indicator_color = text_color
             else:
-                # Use a dimmed version based on card type
                 if completed:
-                    indicator_color = "#88ff88"  # Light green
+                    indicator_color = "#88ff88"
                 elif locked:
                     indicator_color = colors['bg_light']
                 else:
-                    indicator_color = "#6699ff"  # Light blue
+                    indicator_color = "#6699ff"
             
-            CTkLabel(difficulty_frame, text="●",
-                    font=ctk.CTkFont(size=14),
-                    text_color=indicator_color).pack(side='left', padx=2)
+            dot_label = CTkLabel(difficulty_frame, text="●",
+                                font=ctk.CTkFont(size=14),
+                                text_color=indicator_color)
+            dot_label.pack(side='left', padx=2)
+            if not locked:
+                dot_label.configure(cursor="hand2")
+                dot_label.bind("<Button-1>", lambda e: self._start_lesson(lesson))
 
         return card
 
