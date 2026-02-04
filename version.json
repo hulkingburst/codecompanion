@@ -1,5 +1,5 @@
-     {
-       "version": "2.2.0",
+{
+       "version": "3.1.1",
        "download_url": "https://github.com/hulkingburst/codecompanion/releases/latest/download/codecompanion.py",
-       "release_notes": "Added bug fixing drills and auto-update system!"
+       "release_notes": "Perfect clickability + smooth animations!"
      }
