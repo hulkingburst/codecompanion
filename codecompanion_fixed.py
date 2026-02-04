@@ -32,35 +32,87 @@ from customtkinter import (CTk, CTkFrame, CTkLabel, CTkButton, CTkEntry,
 # VERSION & UPDATE SYSTEM
 # ============================================================================
 
-CURRENT_VERSION = "3.1.2"  # Fixed: Cards now use buttons for 100% clickability!
+CURRENT_VERSION = "3.2.0"  # Major auto-update system improvements!
 UPDATE_CHECK_URL = "https://raw.githubusercontent.com/hulkingburst/codecompanion/main/version.json"
 DOWNLOAD_URL = "https://github.com/hulkingburst/codecompanion/releases/latest"
 
 
-def check_for_updates():
-    """Check if a newer version is available"""
-    try:
-        with urllib.request.urlopen(UPDATE_CHECK_URL, timeout=3) as response:
-            data = json.loads(response.read().decode())
-            latest_version = data.get("version", CURRENT_VERSION)
-            download_url = data.get("download_url", DOWNLOAD_URL)
-
-            if latest_version > CURRENT_VERSION:
-                return True, latest_version, download_url
-    except:
-        pass  # Silently fail if update check doesn't work
-    return False, CURRENT_VERSION, None
-
-
-def auto_update_check_and_install():
-    """Automatically check for updates on startup and offer to install"""
-    try:
-        has_update, latest_version, download_url = check_for_updates()
-        if has_update:
-            return True, latest_version, download_url
-    except:
-        pass
-    return False, CURRENT_VERSION, None
+class UpdateChecker:
+    """Handles version checking and updates"""
+    
+    @staticmethod
+    def check_for_updates(timeout=5):
+        """
+        Check if a newer version is available
+        Returns: (has_update, latest_version, download_url, release_notes, error_message)
+        """
+        try:
+            # Make request with timeout
+            request = urllib.request.Request(
+                UPDATE_CHECK_URL,
+                headers={'User-Agent': 'CodeCompanion-App'}
+            )
+            
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                data = json.loads(response.read().decode())
+                
+                latest_version = data.get("version", CURRENT_VERSION)
+                download_url = data.get("download_url", DOWNLOAD_URL)
+                release_notes = data.get("release_notes", "New version available!")
+                
+                # Compare versions (simple string comparison works for semantic versioning)
+                if latest_version > CURRENT_VERSION:
+                    return True, latest_version, download_url, release_notes, None
+                else:
+                    return False, CURRENT_VERSION, None, None, None
+                    
+        except urllib.error.URLError as e:
+            return False, CURRENT_VERSION, None, None, f"Network error: {str(e)}"
+        except json.JSONDecodeError as e:
+            return False, CURRENT_VERSION, None, None, f"Invalid version file: {str(e)}"
+        except Exception as e:
+            return False, CURRENT_VERSION, None, None, f"Update check failed: {str(e)}"
+    
+    @staticmethod
+    def download_update(download_url, callback=None):
+        """
+        Download the update file
+        Returns: (success, file_path, error_message)
+        """
+        try:
+            import tempfile
+            import shutil
+            
+            # Create temp file
+            temp_dir = tempfile.gettempdir()
+            temp_file = os.path.join(temp_dir, "codecompanion_update.py")
+            
+            # Download with progress
+            request = urllib.request.Request(
+                download_url,
+                headers={'User-Agent': 'CodeCompanion-App'}
+            )
+            
+            with urllib.request.urlopen(request, timeout=30) as response:
+                total_size = int(response.headers.get('Content-Length', 0))
+                downloaded = 0
+                
+                with open(temp_file, 'wb') as f:
+                    while True:
+                        chunk = response.read(8192)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        
+                        if callback and total_size > 0:
+                            progress = (downloaded / total_size) * 100
+                            callback(progress)
+            
+            return True, temp_file, None
+            
+        except Exception as e:
+            return False, None, f"Download failed: {str(e)}"
 
 
 # ============================================================================
@@ -2910,7 +2962,7 @@ class SettingsView(CTkFrame):
 class CodeCompanionApp:
     def __init__(self):
         self.root = CTk()
-        self.root.title("CodeCompanion - Learn Python with Your Growing Companion")
+        self.root.title(f"CodeCompanion - Learn Python with Your Growing Companion (v{CURRENT_VERSION})")
         # FIXED: Make window geometry consistent with minsize
         self.root.geometry("1400x900")
         self.root.minsize(1400, 900)
@@ -2931,34 +2983,272 @@ class CodeCompanionApp:
         if self.user is None:
             self._show_onboarding()
         else:
-            # Check for updates on startup (non-blocking)
-            self._auto_update_check()
             self._create_ui()
             self._check_daily_streak()
+            # Check for updates AFTER UI is ready (non-blocking, in background)
+            if getattr(self.user, 'auto_check_updates', True):
+                self.root.after(3000, self._background_update_check)
 
-    def _auto_update_check(self):
-        """Check for updates automatically on startup"""
-        if not hasattr(self.user, 'auto_check_updates') or self.user.auto_check_updates:
-            try:
-                has_update, latest_version, download_url = auto_update_check_and_install()
-                if has_update:
-                    # Show non-intrusive notification
-                    self.root.after(2000, lambda: self._show_update_notification(latest_version, download_url))
-            except:
-                pass  # Silently fail
+    def _background_update_check(self):
+        """Check for updates in background without blocking UI"""
+        import threading
+        
+        def check_updates():
+            has_update, latest_version, download_url, release_notes, error = UpdateChecker.check_for_updates()
+            
+            # Schedule UI update on main thread
+            if has_update:
+                self.root.after(0, lambda: self._show_update_available_dialog(
+                    latest_version, download_url, release_notes
+                ))
+            elif error and False:  # Only show errors if debugging
+                self.root.after(0, lambda: self._show_update_error(error))
+        
+        # Run in background thread
+        thread = threading.Thread(target=check_updates, daemon=True)
+        thread.start()
 
-    def _show_update_notification(self, latest_version, download_url):
-        """Show a friendly update notification"""
-        response = messagebox.askyesno(
-            "Update Available! 🎉",
-            f"CodeCompanion {latest_version} is available!\n\n"
-            f"You're currently on version {CURRENT_VERSION}.\n\n"
-            f"Would you like to download the update?\n"
-            f"(It will open in your browser)",
-            icon='info'
-        )
-        if response:
-            webbrowser.open(download_url)
+    def _show_update_available_dialog(self, latest_version, download_url, release_notes):
+        """Show beautiful update notification dialog"""
+        colors = get_colors()
+        
+        dialog = CTkToplevel(self.root)
+        dialog.title("Update Available!")
+        dialog.geometry("600x500")
+        dialog.grab_set()
+        dialog.transient(self.root)
+        
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (600 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (500 // 2)
+        dialog.geometry(f"600x500+{x}+{y}")
+        
+        main = CTkFrame(dialog, fg_color=colors['bg_dark'])
+        main.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        # Header
+        header = CTkFrame(main, fg_color=colors['primary'], corner_radius=15)
+        header.pack(fill='x', pady=(0, 20))
+        
+        CTkLabel(header, text="🎉 New Version Available!",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=24, weight="bold"),
+                 text_color="white").pack(pady=20)
+        
+        # Version info
+        version_frame = CTkFrame(main, fg_color=colors['bg_medium'], corner_radius=15)
+        version_frame.pack(fill='x', pady=(0, 20))
+        
+        info_content = CTkFrame(version_frame, fg_color="transparent")
+        info_content.pack(fill='x', padx=20, pady=15)
+        
+        CTkLabel(info_content, 
+                 text=f"Current Version: v{CURRENT_VERSION}",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=14),
+                 text_color=colors['text_secondary']).pack(anchor='w')
+        
+        CTkLabel(info_content,
+                 text=f"Latest Version: v{latest_version}",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=16, weight="bold"),
+                 text_color=colors['success']).pack(anchor='w', pady=(5, 0))
+        
+        # Release notes
+        notes_frame = CTkFrame(main, fg_color=colors['bg_medium'], corner_radius=15)
+        notes_frame.pack(fill='both', expand=True, pady=(0, 20))
+        
+        CTkLabel(notes_frame, text="What's New:",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=14, weight="bold")).pack(anchor='w', padx=20, pady=(15, 10))
+        
+        notes_text = CTkTextbox(notes_frame, height=150,
+                                fg_color=colors['bg_dark'],
+                                font=ctk.CTkFont(family=DEFAULT_FONT, size=12))
+        notes_text.pack(fill='both', expand=True, padx=20, pady=(0, 15))
+        notes_text.insert("0.0", release_notes)
+        notes_text.configure(state="disabled")
+        
+        # Buttons
+        button_frame = CTkFrame(main, fg_color="transparent")
+        button_frame.pack(fill='x')
+        
+        def download_and_install():
+            dialog.destroy()
+            self._download_update_dialog(download_url, latest_version)
+        
+        CTkButton(button_frame, text="⬇️ Download & Install Update",
+                  corner_radius=15, height=50,
+                  fg_color=colors['success'],
+                  hover_color=colors['success_hover'],
+                  font=ctk.CTkFont(family=DEFAULT_FONT, size=16, weight="bold"),
+                  command=download_and_install).pack(fill='x', pady=(0, 10))
+        
+        CTkButton(button_frame, text="View on GitHub",
+                  corner_radius=15, height=45,
+                  fg_color=colors['primary'],
+                  font=ctk.CTkFont(family=DEFAULT_FONT, size=14),
+                  command=lambda: [webbrowser.open(DOWNLOAD_URL), dialog.destroy()]).pack(fill='x', pady=(0, 10))
+        
+        CTkButton(button_frame, text="Remind Me Later",
+                  corner_radius=15, height=45,
+                  fg_color=colors['bg_medium'],
+                  font=ctk.CTkFont(family=DEFAULT_FONT, size=14),
+                  command=dialog.destroy).pack(fill='x')
+
+    def _download_update_dialog(self, download_url, version):
+        """Show download progress dialog"""
+        colors = get_colors()
+        
+        dialog = CTkToplevel(self.root)
+        dialog.title("Downloading Update...")
+        dialog.geometry("500x300")
+        dialog.grab_set()
+        dialog.transient(self.root)
+        
+        # Center dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (300 // 2)
+        dialog.geometry(f"500x300+{x}+{y}")
+        
+        main = CTkFrame(dialog, fg_color=colors['bg_dark'])
+        main.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        CTkLabel(main, text=f"Downloading v{version}...",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=20, weight="bold")).pack(pady=(20, 30))
+        
+        progress_bar = CTkProgressBar(main, corner_radius=10, height=20,
+                                     progress_color=colors['primary'])
+        progress_bar.set(0)
+        progress_bar.pack(fill='x', padx=20, pady=(0, 10))
+        
+        status_label = CTkLabel(main, text="Starting download...",
+                               font=ctk.CTkFont(family=DEFAULT_FONT, size=12),
+                               text_color=colors['text_secondary'])
+        status_label.pack(pady=(0, 20))
+        
+        def update_progress(percent):
+            progress_bar.set(percent / 100)
+            status_label.configure(text=f"Downloaded: {percent:.0f}%")
+            dialog.update()
+        
+        def do_download():
+            import threading
+            
+            def download_thread():
+                success, file_path, error = UpdateChecker.download_update(download_url, update_progress)
+                
+                if success:
+                    self.root.after(0, lambda: self._show_install_instructions(dialog, file_path, version))
+                else:
+                    self.root.after(0, lambda: self._show_download_error(dialog, error))
+            
+            thread = threading.Thread(target=download_thread, daemon=True)
+            thread.start()
+        
+        # Start download after a short delay
+        dialog.after(500, do_download)
+
+    def _show_install_instructions(self, dialog, file_path, version):
+        """Show instructions for installing the update"""
+        colors = get_colors()
+        
+        # Clear dialog
+        for widget in dialog.winfo_children():
+            widget.destroy()
+        
+        dialog.title("Update Ready!")
+        
+        main = CTkFrame(dialog, fg_color=colors['bg_dark'])
+        main.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        CTkLabel(main, text="✅ Download Complete!",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=24, weight="bold"),
+                 text_color=colors['success']).pack(pady=(20, 10))
+        
+        CTkLabel(main, text=f"v{version} is ready to install",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=14),
+                 text_color=colors['text_secondary']).pack(pady=(0, 30))
+        
+        # Instructions
+        instructions_frame = CTkFrame(main, fg_color=colors['bg_medium'], corner_radius=15)
+        instructions_frame.pack(fill='both', expand=True, pady=(0, 20), padx=20)
+        
+        instructions_text = f"""
+To install the update:
+
+1. Close CodeCompanion
+2. Replace your current file with the new version
+3. The new file is saved at:
+   {file_path}
+
+Or click "Open File Location" below to see the file.
+        """
+        
+        CTkLabel(instructions_frame, text=instructions_text,
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=12),
+                 justify="left").pack(padx=20, pady=20)
+        
+        # Buttons
+        button_frame = CTkFrame(main, fg_color="transparent")
+        button_frame.pack(fill='x', padx=20)
+        
+        def open_file_location():
+            import subprocess
+            import platform
+            
+            folder = os.path.dirname(file_path)
+            
+            if platform.system() == "Windows":
+                subprocess.Popen(f'explorer /select,"{file_path}"')
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.Popen(["open", "-R", file_path])
+            else:  # Linux
+                subprocess.Popen(["xdg-open", folder])
+        
+        CTkButton(button_frame, text="📁 Open File Location",
+                  corner_radius=15, height=45,
+                  fg_color=colors['primary'],
+                  font=ctk.CTkFont(family=DEFAULT_FONT, size=14),
+                  command=open_file_location).pack(fill='x', pady=(0, 10))
+        
+        CTkButton(button_frame, text="Close",
+                  corner_radius=15, height=45,
+                  fg_color=colors['bg_medium'],
+                  font=ctk.CTkFont(family=DEFAULT_FONT, size=14),
+                  command=dialog.destroy).pack(fill='x')
+
+    def _show_download_error(self, dialog, error):
+        """Show download error"""
+        colors = get_colors()
+        
+        for widget in dialog.winfo_children():
+            widget.destroy()
+        
+        dialog.title("Download Failed")
+        
+        main = CTkFrame(dialog, fg_color=colors['bg_dark'])
+        main.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        CTkLabel(main, text="❌ Download Failed",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=20, weight="bold"),
+                 text_color=colors['error']).pack(pady=(20, 10))
+        
+        CTkLabel(main, text=error,
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=12),
+                 wraplength=400).pack(pady=(0, 30))
+        
+        CTkButton(main, text="Open GitHub Instead",
+                  corner_radius=15, height=45,
+                  fg_color=colors['primary'],
+                  command=lambda: [webbrowser.open(DOWNLOAD_URL), dialog.destroy()]).pack(fill='x', padx=20, pady=(0, 10))
+        
+        CTkButton(main, text="Close",
+                  corner_radius=15, height=45,
+                  fg_color=colors['bg_medium'],
+                  command=dialog.destroy).pack(fill='x', padx=20)
+
+    def _show_update_error(self, error):
+        """Show update check error (only for debugging)"""
+        print(f"Update check failed: {error}")  # Just log it
 
     def _check_daily_streak(self):
         """Check and update streak on app startup"""
@@ -3338,7 +3628,7 @@ class CodeCompanionApp:
                     row += 1
 
     def _create_lesson_card(self, parent, lesson: Lesson):
-        """Create a beautiful lesson card"""
+        """Create a beautiful lesson card - TRULY clickable!"""
         colors = get_colors()
 
         completed = lesson.id in self.user.completed_lessons
@@ -3362,35 +3652,52 @@ class CodeCompanionApp:
             text_color = "white"
             status_icon = "▶"
 
-        # Main card - use a button instead of frame for full clickability!
-        card = CTkButton(
-            parent, 
-            text="",  # No text on button itself
-            corner_radius=20, 
-            fg_color=card_color,
-            hover_color=card_color if locked else (colors['success_hover'] if completed else colors['primary_hover']),
-            border_width=3, 
-            border_color=border_color, 
-            height=200,
-            cursor="hand2" if not locked else "arrow",
-            command=lambda: self._start_lesson(lesson) if not locked else None
-        )
+        # Main card frame
+        card = CTkFrame(parent, corner_radius=20, fg_color=card_color,
+                       border_width=3, border_color=border_color, height=200)
+        card.pack_propagate(False)
+
+        # Click handler
+        def handle_click(event=None):
+            if not locked:
+                self._start_lesson(lesson)
+                return "break"  # Stop event propagation
         
-        # Create content frame on top of button
+        # Bind to the card frame itself
+        if not locked:
+            card.bind("<Button-1>", handle_click)
+            card.configure(cursor="hand2")
+            # Bind to underlying canvas
+            try:
+                card._canvas.bind("<Button-1>", handle_click)
+                card._canvas.configure(cursor="hand2")
+            except:
+                pass
+
+        # Content frame - transparent, passes through clicks
         content = CTkFrame(card, fg_color="transparent")
         content.pack(fill='both', expand=True, padx=20, pady=20)
         
-        # Make content frame not block clicks - pass through to button
-        content.configure(cursor="hand2" if not locked else "arrow")
         if not locked:
-            content.bind("<Button-1>", lambda e: self._start_lesson(lesson))
+            content.bind("<Button-1>", handle_click)
+            content.configure(cursor="hand2")
+
+        # Helper function to make labels clickable
+        def make_label_clickable(label):
+            if not locked:
+                label.bind("<Button-1>", handle_click)
+                label.configure(cursor="hand2")
+                # Bind to internal label widget
+                try:
+                    label._label.bind("<Button-1>", handle_click)
+                    label._label.configure(cursor="hand2")
+                except:
+                    pass
 
         # Status icon (top right)
         icon_label = CTkLabel(content, text=status_icon, font=ctk.CTkFont(size=24))
         icon_label.pack(anchor='ne')
-        if not locked:
-            icon_label.configure(cursor="hand2")
-            icon_label.bind("<Button-1>", lambda e: self._start_lesson(lesson))
+        make_label_clickable(icon_label)
 
         # Lesson title
         title_label = CTkLabel(content, text=lesson.title,
@@ -3398,18 +3705,14 @@ class CodeCompanionApp:
                                text_color=text_color,
                                wraplength=220)
         title_label.pack(anchor='w', pady=(10, 5))
-        if not locked:
-            title_label.configure(cursor="hand2")
-            title_label.bind("<Button-1>", lambda e: self._start_lesson(lesson))
+        make_label_clickable(title_label)
 
         # XP reward
         xp_label = CTkLabel(content, text=f"💎 {lesson.xp_reward} XP",
                             font=ctk.CTkFont(family=DEFAULT_FONT, size=12),
                             text_color=text_color)
         xp_label.pack(anchor='w', pady=(0, 10))
-        if not locked:
-            xp_label.configure(cursor="hand2")
-            xp_label.bind("<Button-1>", lambda e: self._start_lesson(lesson))
+        make_label_clickable(xp_label)
 
         # Item count
         total_items = (len(lesson.exercises) + len(lesson.mcq_questions) + 
@@ -3420,16 +3723,15 @@ class CodeCompanionApp:
                                     font=ctk.CTkFont(family=DEFAULT_FONT, size=11),
                                     text_color=text_color)
         challenges_label.pack(anchor='w')
-        if not locked:
-            challenges_label.configure(cursor="hand2")
-            challenges_label.bind("<Button-1>", lambda e: self._start_lesson(lesson))
+        make_label_clickable(challenges_label)
 
         # Difficulty indicator
         difficulty_frame = CTkFrame(content, fg_color="transparent")
         difficulty_frame.pack(anchor='w', pady=(10, 0))
+        
         if not locked:
+            difficulty_frame.bind("<Button-1>", handle_click)
             difficulty_frame.configure(cursor="hand2")
-            difficulty_frame.bind("<Button-1>", lambda e: self._start_lesson(lesson))
 
         lesson_difficulty = getattr(lesson, 'difficulty', 1)
         for i in range(3):
@@ -3447,9 +3749,7 @@ class CodeCompanionApp:
                                 font=ctk.CTkFont(size=14),
                                 text_color=indicator_color)
             dot_label.pack(side='left', padx=2)
-            if not locked:
-                dot_label.configure(cursor="hand2")
-                dot_label.bind("<Button-1>", lambda e: self._start_lesson(lesson))
+            make_label_clickable(dot_label)
 
         return card
 
@@ -3763,17 +4063,138 @@ class CodeCompanionApp:
 
     # FIXED: Implement update check
     def _check_for_updates(self):
-        """Check for app updates"""
-        try:
-            has_update, latest_version, download_url = check_for_updates()
-            if has_update:
-                if messagebox.askyesno("Update Available",
-                                      f"Version {latest_version} is available!\n\nWould you like to download it?"):
-                    webbrowser.open(download_url)
-            else:
-                messagebox.showinfo("Up to Date", f"You're running the latest version ({CURRENT_VERSION})!")
-        except Exception as e:
-            messagebox.showinfo("Update Check", "Unable to check for updates at this time.")
+        """Manual update check from settings"""
+        colors = get_colors()
+        
+        # Show checking dialog
+        checking_dialog = CTkToplevel(self.root)
+        checking_dialog.title("Checking for Updates...")
+        checking_dialog.geometry("400x200")
+        checking_dialog.grab_set()
+        checking_dialog.transient(self.root)
+        
+        # Center dialog
+        checking_dialog.update_idletasks()
+        x = (checking_dialog.winfo_screenwidth() // 2) - (400 // 2)
+        y = (checking_dialog.winfo_screenheight() // 2) - (200 // 2)
+        checking_dialog.geometry(f"400x200+{x}+{y}")
+        
+        main = CTkFrame(checking_dialog, fg_color=colors['bg_dark'])
+        main.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        CTkLabel(main, text="Checking for updates...",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=16, weight="bold")).pack(pady=(30, 20))
+        
+        progress = CTkProgressBar(main, corner_radius=10, mode="indeterminate")
+        progress.pack(fill='x', padx=40)
+        progress.start()
+        
+        def check_updates():
+            import threading
+            
+            def check_thread():
+                has_update, latest_version, download_url, release_notes, error = UpdateChecker.check_for_updates(timeout=10)
+                
+                checking_dialog.after(0, lambda: checking_dialog.destroy())
+                
+                if error:
+                    self.root.after(0, lambda: self._show_update_check_error(error))
+                elif has_update:
+                    self.root.after(0, lambda: self._show_update_available_dialog(
+                        latest_version, download_url, release_notes
+                    ))
+                else:
+                    self.root.after(0, lambda: self._show_no_updates_dialog())
+            
+            thread = threading.Thread(target=check_thread, daemon=True)
+            thread.start()
+        
+        checking_dialog.after(500, check_updates)
+
+    def _show_no_updates_dialog(self):
+        """Show 'you're up to date' message"""
+        colors = get_colors()
+        
+        dialog = CTkToplevel(self.root)
+        dialog.title("You're Up to Date!")
+        dialog.geometry("450x300")
+        dialog.grab_set()
+        dialog.transient(self.root)
+        
+        # Center dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (450 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (300 // 2)
+        dialog.geometry(f"450x300+{x}+{y}")
+        
+        main = CTkFrame(dialog, fg_color=colors['bg_dark'])
+        main.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        CTkLabel(main, text="✅",
+                 font=ctk.CTkFont(size=60)).pack(pady=(30, 20))
+        
+        CTkLabel(main, text="You're Up to Date!",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=20, weight="bold")).pack(pady=(0, 10))
+        
+        CTkLabel(main, text=f"You have the latest version (v{CURRENT_VERSION})",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=12),
+                 text_color=colors['text_secondary']).pack(pady=(0, 30))
+        
+        CTkButton(main, text="Awesome!",
+                  corner_radius=15, height=45,
+                  fg_color=colors['success'],
+                  font=ctk.CTkFont(family=DEFAULT_FONT, size=14),
+                  command=dialog.destroy).pack(fill='x', padx=40)
+
+    def _show_update_check_error(self, error):
+        """Show error when update check fails"""
+        colors = get_colors()
+        
+        dialog = CTkToplevel(self.root)
+        dialog.title("Update Check Failed")
+        dialog.geometry("500x350")
+        dialog.grab_set()
+        dialog.transient(self.root)
+        
+        # Center dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (350 // 2)
+        dialog.geometry(f"500x350+{x}+{y}")
+        
+        main = CTkFrame(dialog, fg_color=colors['bg_dark'])
+        main.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        CTkLabel(main, text="⚠️",
+                 font=ctk.CTkFont(size=50)).pack(pady=(20, 15))
+        
+        CTkLabel(main, text="Couldn't Check for Updates",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=18, weight="bold")).pack(pady=(0, 10))
+        
+        # Error details
+        error_frame = CTkFrame(main, fg_color=colors['bg_medium'], corner_radius=15)
+        error_frame.pack(fill='both', expand=True, padx=20, pady=(10, 20))
+        
+        CTkLabel(error_frame, text=error,
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=11),
+                 wraplength=400,
+                 justify="left").pack(padx=15, pady=15)
+        
+        CTkLabel(main, text="Try checking manually on GitHub:",
+                 font=ctk.CTkFont(family=DEFAULT_FONT, size=12),
+                 text_color=colors['text_secondary']).pack()
+        
+        CTkButton(main, text="Open GitHub Releases",
+                  corner_radius=15, height=45,
+                  fg_color=colors['primary'],
+                  font=ctk.CTkFont(family=DEFAULT_FONT, size=14),
+                  command=lambda: [webbrowser.open(DOWNLOAD_URL), dialog.destroy()]).pack(fill='x', padx=40, pady=(10, 5))
+        
+        CTkButton(main, text="Close",
+                  corner_radius=15, height=40,
+                  fg_color=colors['bg_medium'],
+                  font=ctk.CTkFont(family=DEFAULT_FONT, size=13),
+                  command=dialog.destroy).pack(fill='x', padx=40)
 
     def _change_theme(self):
         """Theme switching (dark mode only for now)"""
